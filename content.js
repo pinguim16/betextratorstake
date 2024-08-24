@@ -22,16 +22,25 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
 async function extractBets(startDate, endDate) {
   const bets = [];
   let hasNextPage = true;
+  const stopDate = subtractDays(new Date(startDate), 2);
 
   while (hasNextPage) {
       const pageBets = extractBetsFromPage(startDate, endDate);
       bets.push(...pageBets);
 
-      hasNextPage = await navigateToNextPage();
+      const betElements = document.querySelectorAll('div.sport-bet-preview.svelte-ed9n5k');
+      if (betElements.length > 0) {
+          const firstBetDate = parseDate(betElements[0].querySelector('div.date-time.svelte-ed9n5k span').innerText.trim());
+          const lastBetDate = parseDate(betElements[betElements.length - 1].querySelector('div.date-time.svelte-ed9n5k span').innerText.trim());
 
-      // Verificação para evitar loops infinitos
-      if (!hasNextPage || pageBets.length === 0) {
-          break;
+          // Verifica se deve continuar navegando
+          if (lastBetDate && new Date(lastBetDate) > stopDate) {
+              hasNextPage = await navigateToNextPage();
+          } else {
+              break; // Interrompe a busca se a última data estiver antes do intervalo desejado
+          }
+      } else {
+          hasNextPage = false; // Se não houver apostas na página, interrompe a navegação
       }
   }
 
@@ -45,10 +54,10 @@ function extractBetsFromPage(startDate, endDate) {
   betElements.forEach((betElement) => {
       const dateElement = betElement.querySelector('div.date-time.svelte-ed9n5k span');
       const dateText = dateElement ? dateElement.innerText.trim() : null;
-      const betDate = parseDate(dateText); // Para comparações de data
+      const betDate = parseDate(dateText);
 
       if (betDate && betDate >= startDate && betDate <= endDate) {
-          const betData = parseBetData(betElement, betDate);
+          const betData = parseBetData(betElement, dateText); // Passa dateText para parseBetData
           bets.push(betData);
       }
   });
@@ -56,7 +65,7 @@ function extractBetsFromPage(startDate, endDate) {
   return bets;
 }
 
-// Função original para comparações de data
+// Função para parse de data para localização das apostas
 function parseDate(dateText) {
   if (!dateText) return null;
 
@@ -66,7 +75,7 @@ function parseDate(dateText) {
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
-// Nova função para formatar data e hora no padrão YYYY-MM-DD HH:mm para o CSV
+// Função para formatar a data para o CSV no formato YYYY-MM-DD HH:mm
 function formatDateForCSV(dateText) {
   if (!dateText) return null;
 
@@ -76,7 +85,13 @@ function formatDateForCSV(dateText) {
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${timePart}`;
 }
 
-function parseBetData(betElement, betDate) {
+function subtractDays(date, days) {
+  const result = new Date(date);
+  result.setDate(result.getDate() - days);
+  return result;
+}
+
+function parseBetData(betElement, dateText) {
   const stateElement = betElement.querySelector('div.badge');
   let state = 'Unknown';
 
@@ -97,13 +112,7 @@ function parseBetData(betElement, betDate) {
   const selectedOutcomeElement = betElement.querySelector('div.outcome-name.svelte-16byt0j span.weight-semibold');
   const selectedOutcome = selectedOutcomeElement ? selectedOutcomeElement.innerText.trim() : '';
 
-  let label = `${eventName} - ${additionalInfo} - ${selectedOutcome}`;
-
-  // Preenche o campo "Category" com ML ou MS baseado na presença da palavra "vencedor"
-  let category = "MS";
-  if (label.toLowerCase().includes('vencedor')) {
-      category = "ML";
-  }
+  const label = `${eventName} - ${additionalInfo} - ${selectedOutcome}`;
 
   const stakeElement = betElement.querySelector('div.total-stake.svelte-ed9n5k span.weight-normal');
   let stake = stakeElement ? stakeElement.innerText.trim().replace('R$', '').replace(',', '.').trim() : '0.00';
@@ -111,11 +120,14 @@ function parseBetData(betElement, betDate) {
   const oddsElement = betElement.querySelector('span.weight-bold.line-height-default.align-left.size-default.text-size-default.variant-action.with-icon-space.svelte-17v69ua');
   let odds = oddsElement ? oddsElement.innerText.trim().replace(',', '.').trim() : '0.00';
 
-  // Usar formatDateForCSV para a formatação de data e hora na planilha
-  const formattedBetDate = formatDateForCSV(betElement.querySelector('div.date-time.svelte-ed9n5k span').innerText.trim());
+  // Verifica se dateText é válido antes de tentar formatá-lo
+  const formattedDate = dateText ? formatDateForCSV(dateText) : '';
+
+  // Define a categoria com base na presença da palavra "vencedor" no label
+  const category = label.toLowerCase().includes('vencedor') ? 'ML' : 'MS';
 
   return [
-      formattedBetDate, // Data formatada para o CSV
+      formattedDate, // Data formatada para o CSV
       'S',
       'eSport',
       label,
@@ -124,7 +136,7 @@ function parseBetData(betElement, betDate) {
       state,
       'Stake',
       '',
-      category, // Preenche o campo Category com ML ou MS
+      category, // Categoria definida aqui
       '',
       '',
       '',
@@ -136,11 +148,17 @@ function parseBetData(betElement, betDate) {
   ].join(';');
 }
 
-let downloaded = false; // Variável de controle para garantir download único
+async function navigateToNextPage() {
+  const nextButton = document.querySelector('a[data-test="pagination-next"]');
+  if (nextButton && !nextButton.classList.contains('disabled')) {
+      nextButton.click();
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Aguarda 3 segundos para carregar a próxima página
+      return true;
+  }
+  return false;
+}
 
 function downloadCSV(data) {
-  if (downloaded) return; // Evita múltiplos downloads
-
   const csvHeader = "Date;Type;Sport;Label;Odds;Stake;State;Bookmaker;Tipster;Category;Competition;BetType;Closing;Commission;Live;Freebet;Cashout;EachWay;Comment";
   const csvContent = [csvHeader, ...data].join('\n');
 
@@ -154,16 +172,4 @@ function downloadCSV(data) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
-
-  downloaded = true; // Marca o download como concluído
-}
-
-async function navigateToNextPage() {
-  const nextButton = document.querySelector('a[data-test="pagination-next"]');
-  if (nextButton && !nextButton.classList.contains('disabled')) {
-      nextButton.click();
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Aguarda 3 segundos para carregar a próxima página
-      return true;
-  }
-  return false;
 }

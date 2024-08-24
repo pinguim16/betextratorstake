@@ -7,17 +7,21 @@
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-    <h1>Extrator de Apostas</h1>
-    <form id="bet-extractor-form">
-        <label for="start-date">Data Início:</label>
-        <input type="date" id="start-date" name="start-date" required>
-        <br><br>
-        <label for="end-date">Data Fim:</label>
-        <input type="date" id="end-date" name="end-date" required>
-        <br><br>
-        <button type="submit">Iniciar Extração</button>
-    </form>
-    <div id="status"></div>
+    <div class="container">
+        <h1>Extrator de Apostas Stake</h1>
+        <form id="bet-extractor-form">
+            <div class="form-group">
+                <label for="start-date">Data Início:</label>
+                <input type="date" id="start-date" name="start-date" required>
+            </div>
+            <div class="form-group">
+                <label for="end-date">Data Fim:</label>
+                <input type="date" id="end-date" name="end-date" required>
+            </div>
+            <button type="submit" class="extract-button">Iniciar Extração</button>
+        </form>
+        <div id="status"></div>
+    </div>
     <script src="popup.js"></script>
 </body>
 </html>
