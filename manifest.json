@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Bet Extractor Stake",
+  "version": "1.0",
+  "description": "Plugin para extrair bets do site da stake",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["stake.js", "bet365.js", "content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
