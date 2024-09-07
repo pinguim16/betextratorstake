@@ -1,3 +1,5 @@
+let isDownloaded = false; // Variável global para controlar o download
+
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   if (request.action === 'extractBets') {
       const { startDate, endDate } = request.data;
@@ -5,7 +7,10 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       try {
           const data = await extractBets(startDate, endDate);
           if (data.length > 0) {
-              downloadCSV(data);
+              if (!isDownloaded) { // Certifica-se de que o download só aconteça uma vez
+                  downloadCSV(data, startDate, endDate);
+                  isDownloaded = true; // Marca como já baixado
+              }
               sendResponse({ success: true, dataLength: data.length });
           } else {
               console.log('Nenhuma aposta encontrada no intervalo especificado.');
@@ -14,6 +19,8 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       } catch (error) {
           console.error('Erro durante a extração:', error);
           sendResponse({ success: false, message: error.message });
+      } finally {
+          isDownloaded = false; // Redefine a variável de controle após a operação
       }
   }
   return true; // Indica que a resposta será enviada de forma assíncrona
@@ -26,7 +33,14 @@ async function extractBets(startDate, endDate) {
 
   while (hasNextPage) {
       const pageBets = extractBetsFromPage(startDate, endDate);
-      bets.push(...pageBets);
+
+      // Evitar duplicatas comparando a data e o nome do evento
+      pageBets.forEach(bet => {
+          const isDuplicate = bets.some(existingBet => existingBet === bet);
+          if (!isDuplicate) {
+              bets.push(bet);
+          }
+      });
 
       const betElements = document.querySelectorAll('div.sport-bet-preview.svelte-ed9n5k');
       if (betElements.length > 0) {
@@ -117,26 +131,24 @@ function parseBetData(betElement, dateText) {
   const stakeElement = betElement.querySelector('div.total-stake.svelte-ed9n5k span.weight-normal');
   let stake = stakeElement ? stakeElement.innerText.trim().replace('R$', '').replace(',', '.').trim() : '0.00';
 
-  const oddsElement = betElement.querySelector('span.weight-bold.line-height-default.align-left.size-default.text-size-default.variant-action.with-icon-space.svelte-17v69ua');
+  const oddsElement = betElement.querySelector('div.odds.svelte-bbfzn7 span.leading-normal.font-bold.text-blue-400');
   let odds = oddsElement ? oddsElement.innerText.trim().replace(',', '.').trim() : '0.00';
 
-  // Verifica se dateText é válido antes de tentar formatá-lo
   const formattedDate = dateText ? formatDateForCSV(dateText) : '';
 
-  // Define a categoria com base na presença da palavra "vencedor" no label
   const category = label.toLowerCase().includes('vencedor') ? 'ML' : 'MS';
 
   return [
-      formattedDate, // Data formatada para o CSV
+      formattedDate, 
       'S',
       'eSport',
       label,
-      odds,
+      odds, 
       stake,
       state,
       'Stake',
       '',
-      category, // Categoria definida aqui
+      category, 
       '',
       '',
       '',
@@ -158,18 +170,43 @@ async function navigateToNextPage() {
   return false;
 }
 
-function downloadCSV(data) {
+function downloadCSV(data, startDate, endDate) {
   const csvHeader = "Date;Type;Sport;Label;Odds;Stake;State;Bookmaker;Tipster;Category;Competition;BetType;Closing;Commission;Live;Freebet;Cashout;EachWay;Comment";
   const csvContent = [csvHeader, ...data].join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
 
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `bets_${new Date().toISOString().split('T')[0]}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  try {
+      // Verifica se as datas estão no formato correto antes de usar
+      const start = formatDateForFileName(startDate);
+      const end = formatDateForFileName(endDate);
+      const fileName = `bet_stake_${start}_to_${end}.csv`;
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+  } catch (error) {
+      console.error('Erro ao gerar o nome do arquivo:', error);
+  }
+}
+
+// Função para formatar a data no formato YYYY-MM-DD para o nome do arquivo
+function formatDateForFileName(dateText) {
+  if (!dateText || typeof dateText !== 'string') {
+      throw new Error('Data inválida fornecida para o nome do arquivo');
+  }
+  
+  const dateParts = dateText.split('-');
+  
+  if (dateParts.length !== 3) {
+      throw new Error('Formato de data inválido, esperado YYYY-MM-DD');
+  }
+  
+  const [year, month, day] = dateParts;
+  return `${year}-${month}-${day}`;
 }

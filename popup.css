@@ -1,67 +1,86 @@
-body {
-    font-family: 'Arial', sans-serif;
-    background-color: #f9f9f9;
-    color: #333;
+* {
     margin: 0;
-    padding: 20px;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f0f4f8;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    color: #333;
 }
 
 .container {
-    max-width: 300px;
-    margin: 0 auto;
-    padding: 20px;
-    background-color: #ffffff;
+    background-color: #fff;
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    width: 350px;
+    text-align: center;
 }
 
 h1 {
-    font-size: 1.5em;
-    color: #0044cc;
-    text-align: center;
+    font-size: 1.8em;
+    color: #007bff;
     margin-bottom: 20px;
 }
 
 .form-group {
     margin-bottom: 15px;
+    text-align: left;
 }
 
 label {
-    display: block;
-    font-size: 0.9em;
-    margin-bottom: 5px;
+    font-weight: 500;
     color: #555;
+    display: block;
+    margin-bottom: 5px;
 }
 
 input[type="date"] {
     width: 100%;
-    padding: 8px;
-    margin-top: 5px;
+    padding: 10px;
     border: 1px solid #ccc;
     border-radius: 5px;
     font-size: 1em;
-    box-sizing: border-box;
+    background-color: #f9f9f9;
 }
 
-button.extract-button {
-    width: 100%;
-    padding: 10px;
-    background-color: #0044cc;
-    color: white;
+input[type="date"]:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+.extract-button {
+    background-color: #007bff;
+    color: #fff;
     border: none;
+    padding: 10px 15px;
     border-radius: 5px;
-    font-size: 1em;
+    font-size: 1.1em;
     cursor: pointer;
     transition: background-color 0.3s ease;
+    width: 100%;
 }
 
-button.extract-button:hover {
-    background-color: #003399;
+.extract-button:hover {
+    background-color: #0056b3;
 }
 
-#status {
+.status {
     margin-top: 20px;
-    font-size: 0.9em;
-    text-align: center;
+    font-size: 1em;
     color: #333;
+}
+
+.status.success {
+    color: #28a745;
+}
+
+.status.error {
+    color: #dc3545;
 }
