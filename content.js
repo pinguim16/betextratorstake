@@ -1,30 +1,47 @@
 let isDownloaded = false; // Variável global para controlar o download
+let isExtracting = false; // Variável global para controlar o processo de extração
 
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
-  if (request.action === 'extractBets') {
-      const { startDate, endDate } = request.data;
+    if (request.action === 'extractBets') {
+        const { startDate, endDate } = request.data;
 
-      try {
-          const data = await extractBets(startDate, endDate);
-          if (data.length > 0) {
-              if (!isDownloaded) { // Certifica-se de que o download só aconteça uma vez
-                  downloadCSV(data, startDate, endDate);
-                  isDownloaded = true; // Marca como já baixado
-              }
-              sendResponse({ success: true, dataLength: data.length });
-          } else {
-              console.log('Nenhuma aposta encontrada no intervalo especificado.');
-              sendResponse({ success: false, message: 'Nenhuma aposta encontrada.' });
-          }
-      } catch (error) {
-          console.error('Erro durante a extração:', error);
-          sendResponse({ success: false, message: error.message });
-      } finally {
-          isDownloaded = false; // Redefine a variável de controle após a operação
-      }
-  }
-  return true; // Indica que a resposta será enviada de forma assíncrona
+        // Verifica se a extração já está em andamento
+        if (isExtracting) {
+            console.log('Extração já está em andamento. Ignorando solicitação duplicada.');
+            sendResponse({ success: false, message: 'Extração já está em andamento.' });
+            return true; // Retorna true para indicar que a resposta será enviada de forma assíncrona
+        }
+
+        isExtracting = true; // Define que o processo de extração começou
+
+        try {
+            console.log('Iniciando extração para o intervalo:', startDate, 'até', endDate);
+            const data = await extractBets(startDate, endDate);
+
+            if (data.length > 0) {
+                if (!isDownloaded) {
+                    console.log('Baixando CSV...');
+                    downloadCSV(data, startDate, endDate);
+                    isDownloaded = true;
+                }
+                console.log('Extração concluída com sucesso:', data.length, 'apostas encontradas.');
+                sendResponse({ success: true, data: data.length }); // Envia a resposta após extração bem-sucedida
+            } else {
+                console.log('Nenhuma aposta encontrada no intervalo especificado.');
+                sendResponse({ success: false, message: 'Nenhuma aposta encontrada.' });
+            }
+        } catch (error) {
+            console.error('Erro durante a extração:', error);
+            sendResponse({ success: false, message: error.message }); // Envia a resposta com o erro
+        } finally {
+            isExtracting = false; // Redefine a variável de controle
+            isDownloaded = false; // Redefine o status de download após a execução
+        }
+
+        return true; // Garantir que a resposta seja enviada de forma assíncrona
+    }
 });
+
 
 async function extractBets(startDate, endDate) {
   const bets = [];
